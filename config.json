@@ -1,0 +1,7 @@
+{
+  "send_nodeinfo": true,
+  "nodeinfo_interval": 600,
+  "mac": "000000000000",
+  "short_name": "0000",
+  "long_name": "xxxx"
+}

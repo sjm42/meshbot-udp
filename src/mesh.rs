@@ -14,11 +14,24 @@ pub struct MyNodeInfo {
     pub id_s: String,
     pub short_name: String,
     pub long_name: String,
-    pub mac: [u8; 6],
-    pub hw_model: String,
+    pub hw_model: i32,
     pub licensed: bool,
-    pub role: String,
+    pub role: i32,
     pub last_seen: i64,
+}
+
+impl From<User> for MyNodeInfo {
+    fn from(user: User) -> Self {
+        Self {
+            id_s: user.id,
+            short_name: user.short_name,
+            long_name: user.long_name,
+            hw_model: user.hw_model,
+            licensed: user.is_licensed,
+            role: user.role,
+            last_seen: Utc::now().timestamp(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -28,7 +41,7 @@ pub struct NodeDb {
 impl NodeDb {
     pub fn save(&self, opts: &CliOpts) -> anyhow::Result<()> {
         let file = &opts.nodedb_file;
-        info!("Saving state to {file}");
+        info!("Saving nodedb to {file}");
         BufWriter::new(File::create(file)?).write_all(serde_json::to_string(self)?.as_bytes())?;
         Ok(())
     }
@@ -130,7 +143,7 @@ async fn handle_textmessage(
 }
 
 async fn handle_nodeinfo(
-    _state: Arc<MyState>,
+    state: Arc<MyState>,
     _rx_packet: MeshPacket,
     rx_data: Data,
 ) -> anyhow::Result<HandlerStatus> {
@@ -140,6 +153,10 @@ async fn handle_nodeinfo(
 
     let nodeinfo = protobufs::User::decode(rx_data.payload.as_slice()).unwrap_or_default();
     info!("Parsed Nodeinfo:\n{nodeinfo:?}");
+
+    let mut nodedb = state.nodedb.write().await;
+    nodedb.db.insert(123, nodeinfo.into());
+    nodedb.save(&state.opts)?;
     Ok(HandlerStatus::Continue)
 }
 

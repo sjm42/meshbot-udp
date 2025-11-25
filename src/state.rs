@@ -6,7 +6,7 @@ use crate::*;
 pub struct MyState {
     pub opts: CliOpts,
     pub config: MyConfig,
-    pub nodedb: NodeDb,
+    pub nodedb: RwLock<NodeDb>,
     pub interface_addr: net::IpAddr,
     pub multicast_addr: net::IpAddr,
     pub multi_sockaddr: net::SocketAddr,
@@ -28,7 +28,7 @@ impl MyState {
 
         let db_file = &opts.nodedb_file;
         info!("Attempt reading nodedb file {db_file}");
-        let nodedb: NodeDb = match File::open(db_file) {
+        let nodedb = match File::open(db_file) {
             // if the file does exist, the contents must be valid
             Ok(bfile) => serde_json::from_reader(BufReader::new(bfile))?,
             Err(e) => {
@@ -39,11 +39,12 @@ impl MyState {
                 db
             }
         };
+        info!("We have nodedb with {} entries.", nodedb.db.len());
 
         Ok(Self {
             opts,
             config,
-            nodedb,
+            nodedb: RwLock::new(nodedb),
             interface_addr,
             multicast_addr,
             multi_sockaddr,

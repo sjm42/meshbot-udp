@@ -150,7 +150,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -556,10 +558,11 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "meshbot_udp"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "build-data",
+ "chrono",
  "clap",
  "futures",
  "hex-literal",

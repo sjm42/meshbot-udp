@@ -62,8 +62,10 @@ impl CliOpts {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MyConfig {
     pub send_nodeinfo: bool,
-    pub nodeinfo_interval: i64,
+    pub nodeinfo_interval: u64,
+    pub hop_limit: u8,
     pub aes_key: [u8; 16],
+    pub udp_whitelist: HashMap<String, bool>,
 
     pub mac: [u8; 6],
     pub node_id: u32,
@@ -85,8 +87,9 @@ impl Default for MyConfig {
         Self {
             send_nodeinfo: true,
             nodeinfo_interval: 3600,
+            hop_limit: DEFAULT_HOP_LIMIT,
             aes_key: DEFAULT_AES_KEY,
-
+            udp_whitelist: HashMap::from([("*".into(), true)]),
             mac,
             node_id,
             node_id_s: format!("!{:02x}{:02x}{:02x}{:02x}", mac[2], mac[3], mac[4], mac[5]),
@@ -108,7 +111,7 @@ impl MyConfig {
                 let c = MyConfig::default();
                 info!("Writing new config to {file}");
                 BufWriter::new(File::create(file)?)
-                    .write_all(serde_json::to_string(&c)?.as_bytes())?;
+                    .write_all(serde_json::to_string_pretty(&c)?.as_bytes())?;
                 info!("New config file saved.");
                 c
             }

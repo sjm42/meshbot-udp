@@ -19,14 +19,13 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
     let state = Arc::new(MyState::new(opts, config).await?);
 
-    info!("Binding to multicast address {}", state.multi_sockaddr);
+    debug!("Binding to multicast address {}", state.multi_sockaddr);
     let sock_rx = tokio::net::UdpSocket::bind(state.multi_sockaddr).await?;
 
-    info!("Joining multicast group");
+    debug!("Joining multicast group");
     if let (net::IpAddr::V4(multi), net::IpAddr::V4(iface)) =
         (state.multicast_addr, state.interface_addr)
     {
@@ -38,20 +37,32 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
     info!(
         "Listening on {} ({})",
         sock_rx.local_addr()?,
-        String::from_utf8_lossy(sock_rx.device()?.unwrap_or_default().as_slice())
+        String::from_utf8_lossy(
+            sock_rx.device()?.unwrap_or_default().as_slice()
+        )
     );
+
+    tokio::task::spawn(send_nodeinfo(state.clone()));
 
     let mut dispatcher = MsgDispatcher::default();
     dispatcher.add_handler(PortNum::TextMessageApp, reply_to_ping);
 
     let mut udp_rx_buf = [0; BUFSZ];
     loop {
-        let (len, addr) = sock_rx.recv_from(&mut udp_rx_buf).await?;
-        info!(
-            "Received {len} bytes from {addr}:\n{:02x?}",
-            &udp_rx_buf[0..len]
-        );
+        let (len, rx_addr) = sock_rx.recv_from(&mut udp_rx_buf).await?;
+        info!("Received {len} bytes from {rx_addr}");
 
+        if rx_addr == state.tx_sockaddr {
+            info!("Ignoring udp from self");
+            continue;
+        }
+        match get_wild(&state.config.udp_whitelist, &rx_addr.to_string()) {
+            Some(true) => (), // pass it
+            _ => {
+                info!("RX address not whitelisted. Packet ignored.");
+                continue;
+            }
+        }
         // attempting to decode mesh packet structure
         let rx_packet = match MeshPacket::decode(&udp_rx_buf[..len]) {
             Ok(packet) => packet,
@@ -62,6 +73,16 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
         };
         info!("Decoded packet:\n{rx_packet:?}");
 
+        {
+            // inner scope to release write lock
+            let mut pcache = state.packet_cache.write().await;
+            if pcache.get(&rx_packet.id).is_some() {
+                info!("Duplicate packet ignored.");
+                continue;
+            }
+            pcache.insert(rx_packet.id, Utc::now().timestamp());
+        }
+
         // outer structure of mesh packet was successfully parsed,
         // now attempt decryption
 
@@ -69,7 +90,7 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
             None => continue, // skipping non-encrypted packets here
             Some(p) => p,
         };
-        info!("Decrypted payload:\n{:?}", payload.hex_dump());
+        debug!("Decrypted payload:\n{:?}", payload.hex_dump());
 
         // attempting to decode the inner payload that was supposedly decrypted
 
@@ -82,7 +103,7 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
         };
         info!("Decoded payload:\n{rx_data:?}");
         dispatcher
-            .process(state.clone(), rx_packet.clone(), rx_data.clone())
+            .process(state.clone(), rx_addr, rx_packet.clone(), rx_data.clone())
             .await;
     }
 
@@ -93,7 +114,8 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
 
 async fn reply_to_ping(
     state: Arc<MyState>,
-    rx_packet: MeshPacket,
+    _rx_addr: net::SocketAddr,
+    _rx_packet: MeshPacket,
     rx_data: Data,
 ) -> anyhow::Result<HandlerStatus> {
     if rx_data.payload != "Pim".as_bytes() {
@@ -102,7 +124,13 @@ async fn reply_to_ping(
     }
 
     let reply = "Pom";
-    send_text_msg(state, rx_packet.from, reply).await?;
+    let tx_addr = state.multi_sockaddr;
+
+    // for some reason, sending to the node is not working
+    // send_text_msg(state, tx_addr, rx_packet.from, reply).await?;
+
+    // ...but sending to broadcast works, sigh.
+    send_text_msg(state, tx_addr, MESH_BROADCAST_ADDR, reply).await?;
     Ok(HandlerStatus::Continue)
 }
 // EOF

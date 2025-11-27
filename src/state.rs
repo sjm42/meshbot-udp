@@ -7,6 +7,8 @@ pub struct MyState {
     pub opts: CliOpts,
     pub config: MyConfig,
     pub nodedb: RwLock<NodeDb>,
+
+    pub packet_cache: RwLock<HashMap<u32, i64>>,
     pub interface_addr: net::IpAddr,
     pub multicast_addr: net::IpAddr,
     pub multi_sockaddr: net::SocketAddr,
@@ -45,6 +47,8 @@ impl MyState {
             opts,
             config,
             nodedb: RwLock::new(nodedb),
+
+            packet_cache: RwLock::new(HashMap::new()),
             interface_addr,
             multicast_addr,
             multi_sockaddr,

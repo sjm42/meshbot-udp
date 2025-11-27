@@ -2,7 +2,7 @@
 
 [package]
 name = "meshbot_udp"
-version = "0.0.3"
+version = "0.2.0"
 edition = "2024"
 resolver = "2"
 
@@ -16,7 +16,8 @@ serde = []
 
 [dependencies]
 anyhow = "1"
-chrono = {version = "0"}
+base64 = { version = "0" }
+chrono = { version = "0" }
 clap = { version = "4", features = ["derive"] }
 futures = { version = "0" }
 hex-literal = "1"

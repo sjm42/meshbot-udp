@@ -37,9 +37,7 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
     info!(
         "Listening on {} ({})",
         sock_rx.local_addr()?,
-        String::from_utf8_lossy(
-            sock_rx.device()?.unwrap_or_default().as_slice()
-        )
+        String::from_utf8_lossy(sock_rx.device()?.unwrap_or_default().as_slice())
     );
 
     tokio::task::spawn(send_nodeinfo(state.clone()));
@@ -86,7 +84,7 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
         // outer structure of mesh packet was successfully parsed,
         // now attempt decryption
 
-        let payload = match decrypt_payload(&rx_packet, &state.config.aes_key) {
+        let payload = match decrypt_payload(&rx_packet, &state.config) {
             None => continue, // skipping non-encrypted packets here
             Some(p) => p,
         };
@@ -113,24 +111,20 @@ async fn run_server(opts: CliOpts, config: MyConfig) -> anyhow::Result<()> {
 }
 
 async fn reply_to_ping(
-    state: Arc<MyState>,
-    _rx_addr: net::SocketAddr,
-    _rx_packet: MeshPacket,
-    rx_data: Data,
+    state: Arc<MyState>, _rx_addr: net::SocketAddr, rx_packet: MeshPacket, rx_data: Data,
 ) -> anyhow::Result<HandlerStatus> {
-    if rx_data.payload != "Pim".as_bytes() {
+    if rx_data.payload != "!ping".as_bytes() {
         debug!("Not sending a response");
         return Ok(HandlerStatus::Continue);
     }
 
-    let reply = "Pom";
+    let reply = "pong! (LOL WAT)";
     let tx_addr = state.multi_sockaddr;
 
-    // for some reason, sending to the node is not working
-    // send_text_msg(state, tx_addr, rx_packet.from, reply).await?;
+    // not sending to broadcast
+    // send_text_msg(state, tx_addr, MESH_BROADCAST_ADDR, reply).await?;
 
-    // ...but sending to broadcast works, sigh.
-    send_text_msg(state, tx_addr, MESH_BROADCAST_ADDR, reply).await?;
+    send_private_msg(state, tx_addr, rx_packet.from, reply).await?;
     Ok(HandlerStatus::Continue)
 }
 // EOF

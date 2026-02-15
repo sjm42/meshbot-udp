@@ -34,7 +34,9 @@ impl MyState {
             // if the file does exist, the contents must be valid
             Ok(bfile) => serde_json::from_reader(BufReader::new(bfile))?,
             Err(e) => {
-                info!("Cannot read nodedb from {db_file}: {e} -- Using empty nodedb");
+                info!(
+                    "Cannot read nodedb from {db_file}: {e} -- Using empty nodedb"
+                );
                 let db = NodeDb::default();
                 db.save(&opts)?;
                 info!("New nodedb file saved.");

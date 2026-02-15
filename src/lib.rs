@@ -2,9 +2,9 @@
 
 pub use std::{
     collections::{hash_map::Entry, HashMap},
-    fs::File,
+    fs::{self, File},
     io::{BufReader, BufWriter, Write},
-    net,
+    net, path,
     sync::Arc,
 };
 
@@ -12,11 +12,11 @@ pub use chrono::*;
 pub use hex_literal::hex;
 pub use pretty_hex::*;
 pub use prost::Message;
-pub use protobufs::config::device_config::Role;
-pub use protobufs::mesh_packet::{
-    PayloadVariant, Priority, TransportMechanism,
+pub use protobufs::{
+    config::device_config::Role, mesh_packet::{PayloadVariant, Priority, TransportMechanism}, Data, HardwareModel, MeshPacket,
+    PortNum,
+    User,
 };
-pub use protobufs::{Data, HardwareModel, MeshPacket, PortNum, User};
 pub use rand::{prelude::*, rngs::StdRng, SeedableRng};
 pub use serde::{Deserialize, Serialize};
 pub use tokio::{
@@ -52,6 +52,7 @@ pub const DEFAULT_AES_KEY: [u8; 16] =
     hex!("d4 f1 bb 3a 20 29 07 59 f0 bc ff ab cf 4e 69 01");
 
 pub const DEFAULT_HOP_LIMIT: u8 = 5;
+pub const DEFAULT_CHANNEL_NAME: &str = "EdgeFastLow";
 
 pub fn get_wild<'a, T>(
     map: &'a HashMap<String, T>,

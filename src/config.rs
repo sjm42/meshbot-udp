@@ -1,5 +1,7 @@
 // config.rs
 
+use x25519_dalek::{PublicKey, StaticSecret};
+
 use crate::*;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, clap::Parser)]
@@ -64,6 +66,7 @@ pub struct MyConfig {
     pub send_nodeinfo: bool,
     pub nodeinfo_interval: u64,
     pub hop_limit: u8,
+    pub channel_name: String,
     pub aes_key: [u8; 16],
     pub udp_whitelist: HashMap<String, bool>,
 
@@ -72,6 +75,8 @@ pub struct MyConfig {
     pub node_id_s: String,
     pub short_name: String,
     pub long_name: String,
+    pub private_key: [u8; 32],
+    pub public_key: [u8; 32],
 }
 
 impl Default for MyConfig {
@@ -84,10 +89,15 @@ impl Default for MyConfig {
         mac[0] |= 0b0000_0010; // make it "locally administered"
         let node_id =
             (mac[2] as u32) << 24 | (mac[3] as u32) << 16 | (mac[4] as u32) << 8 | mac[5] as u32;
+        let mut key_bytes = [0u8; 32];
+        rng.fill_bytes(&mut key_bytes);
+        let secret = StaticSecret::from(key_bytes);
+        let public = PublicKey::from(&secret);
         Self {
             send_nodeinfo: true,
             nodeinfo_interval: 3600,
             hop_limit: DEFAULT_HOP_LIMIT,
+            channel_name: DEFAULT_CHANNEL_NAME.into(),
             aes_key: DEFAULT_AES_KEY,
             udp_whitelist: HashMap::from([("*".into(), true)]),
             mac,
@@ -95,6 +105,8 @@ impl Default for MyConfig {
             node_id_s: format!("!{:02x}{:02x}{:02x}{:02x}", mac[2], mac[3], mac[4], mac[5]),
             short_name: format!("{:02x}{:02x}", mac[4], mac[5]),
             long_name: format!("Example node {:02x}{:02x}", mac[4], mac[5]),
+            private_key: secret.to_bytes(),
+            public_key: public.to_bytes(),
         }
     }
 }
@@ -109,6 +121,9 @@ impl MyConfig {
             Err(e) => {
                 info!("Error reading config file {file}: {e} -- Using default config");
                 let c = MyConfig::default();
+                if let Some(parent) = path::Path::new(file).parent() {
+                    fs::create_dir_all(parent)?;
+                }
                 info!("Writing new config to {file}");
                 BufWriter::new(File::create(file)?)
                     .write_all(serde_json::to_string_pretty(&c)?.as_bytes())?;

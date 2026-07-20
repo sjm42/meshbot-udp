@@ -24,7 +24,7 @@ impl MyState {
         let multi_sockaddr = net::SocketAddr::new(multicast_addr, opts.port);
         let tx_sockaddr = net::SocketAddr::new(interface_addr, opts.port);
 
-        let rng = Mutex::new(StdRng::from_os_rng());
+        let rng = Mutex::new(rand::make_rng());
         info!("Binding to local address {}", tx_sockaddr);
         let sock_tx = tokio::net::UdpSocket::bind(tx_sockaddr).await?;
 

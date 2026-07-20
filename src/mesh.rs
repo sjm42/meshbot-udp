@@ -308,7 +308,7 @@ pub fn encrypt_payload_pki(
     let shared_secret = secret.diffie_hellman(&public);
 
     // SHA-256 key derivation
-    let aes_key = Sha256::digest(shared_secret.as_bytes());
+    let aes_key: [u8; 32] = Sha256::digest(shared_secret.as_bytes()).into();
 
     // 13-byte CCM nonce: [packet_id(4), extra_nonce(4), from_node(4), 0x00]
     let mut nonce = [0u8; 13];
@@ -317,7 +317,7 @@ pub fn encrypt_payload_pki(
     nonce[8..12].copy_from_slice(&from_node.to_le_bytes());
 
     // AES-256-CCM encrypt (produces ciphertext + 8-byte tag)
-    let cipher = Aes256Ccm::new((&*aes_key).into());
+    let cipher = Aes256Ccm::new((&aes_key).into());
     let ciphertext_and_tag = cipher
         .encrypt((&nonce).into(), plaintext)
         .map_err(|e| anyhow::anyhow!("AES-256-CCM encryption failed: {e}"))?;
@@ -360,7 +360,7 @@ fn decrypt_payload_pki(
     let secret = StaticSecret::from(config.private_key);
     let public = PublicKey::from(remote_pub_bytes);
     let shared_secret = secret.diffie_hellman(&public);
-    let aes_key = Sha256::digest(shared_secret.as_bytes());
+    let aes_key: [u8; 32] = Sha256::digest(shared_secret.as_bytes()).into();
 
     // 13-byte CCM nonce: [packet_id(4), extra_nonce(4), from_node(4), 0x00]
     let mut nonce = [0u8; 13];
@@ -368,7 +368,7 @@ fn decrypt_payload_pki(
     nonce[4..8].copy_from_slice(&extra_nonce.to_le_bytes());
     nonce[8..12].copy_from_slice(&rx_packet.from.to_le_bytes());
 
-    let cipher = Aes256Ccm::new((&*aes_key).into());
+    let cipher = Aes256Ccm::new((&aes_key).into());
     match cipher.decrypt((&nonce).into(), ccm_input) {
         Ok(plaintext) => {
             info!("PKI decryption succeeded ({} bytes)", plaintext.len());
